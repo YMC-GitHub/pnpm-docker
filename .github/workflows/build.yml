@@ -1,0 +1,133 @@
+name: build
+
+on: push
+
+jobs:
+  build:
+    name: Build Images
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        node: [18, 20, 21, 22]
+        os: ["bullseye", "alpine"]
+    env:
+      default_node: 22
+      default_os: bullseye
+      pnpm_patch: 9.4.0
+      pnpm_minor: 9.4
+      pnpm_major: 9
+      ns: ${{ secrets.DOCKER_USERNAME }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Build images
+        run: |
+          docker build --build-arg base=$node-$os --build-arg pnpm=$pnpm_patch \
+            -t $ns/pnpm:$pnpm_patch-node$node-$os \
+            -t $ns/pnpm:$pnpm_minor-node$node-$os \
+            -t $ns/pnpm:$pnpm_major-node$node-$os \
+            -t $ns/pnpm:node$node-$os .
+        env:
+          node: ${{ matrix.node }}
+          os: ${{ matrix.os }}
+      - name: Build images with default OS
+        if: ${{ matrix.os == env.default_os }}
+        run: |
+          docker build --build-arg base=$node-$default_os --build-arg pnpm=$pnpm_patch \
+            -t $ns/pnpm:$pnpm_patch-node$node \
+            -t $ns/pnpm:$pnpm_minor-node$node \
+            -t $ns/pnpm:$pnpm_major-node$node \
+            -t $ns/pnpm:node$node .
+        env:
+          node: ${{ matrix.node }}
+      - name: Build images with default Node.js
+        if: ${{ matrix.node == env.default_node }}
+        run: |
+          docker build --build-arg base=$default_node-$os --build-arg pnpm=$pnpm_patch \
+            -t $ns/pnpm:$pnpm_patch-$os \
+            -t $ns/pnpm:$pnpm_minor-$os \
+            -t $ns/pnpm:$pnpm_major-$os \
+            -t $ns/pnpm:$os .
+        env:
+          os: ${{ matrix.os }}
+      - name: Build images with default Node.js and default OS
+        if: ${{ matrix.node == env.default_node && matrix.os == env.default_os }}
+        run: |
+          docker build --build-arg base=$default_node-$default_os --build-arg pnpm=$pnpm_patch \
+            -t $ns/pnpm:$pnpm_patch \
+            -t $ns/pnpm:$pnpm_minor \
+            -t $ns/pnpm:$pnpm_major \
+            -t $ns/pnpm .
+      - name: Test images
+        run: |
+          docker run $ns/pnpm:$pnpm_patch-node$node-$os -v
+          docker run $ns/pnpm:$pnpm_minor-node$node-$os -v
+          docker run $ns/pnpm:$pnpm_major-node$node-$os -v
+          docker run $ns/pnpm:node$node-$os -v
+        env:
+          node: ${{ matrix.node }}
+          os: ${{ matrix.os }}
+      - name: Test images with default OS
+        if: ${{ matrix.os == env.default_os }}
+        run: |
+          docker run $ns/pnpm:$pnpm_patch-node$node -v
+          docker run $ns/pnpm:$pnpm_minor-node$node -v
+          docker run $ns/pnpm:$pnpm_major-node$node -v
+          docker run $ns/pnpm:node$node -v
+        env:
+          node: ${{ matrix.node }}
+      - name: Test images with default Node.js
+        if: ${{ matrix.node == env.default_node }}
+        run: |
+          docker run $ns/pnpm:$pnpm_patch-$os -v
+          docker run $ns/pnpm:$pnpm_minor-$os -v
+          docker run $ns/pnpm:$pnpm_major-$os -v
+          docker run $ns/pnpm:$os -v
+        env:
+          os: ${{ matrix.os }}
+      - name: Test images with default Node.js and default OS
+        if: ${{ matrix.node == env.default_node && matrix.os == env.default_os }}
+        run: |
+          docker run $ns/pnpm:$pnpm_patch -v
+          docker run $ns/pnpm:$pnpm_minor -v
+          docker run $ns/pnpm:$pnpm_major -v
+          docker run $ns/pnpm -v
+      - uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+      - name: Publish images
+        run: |
+          docker push $ns/pnpm:$pnpm_patch-node$node-$os
+          docker push $ns/pnpm:$pnpm_minor-node$node-$os
+          docker push $ns/pnpm:$pnpm_major-node$node-$os
+          docker push $ns/pnpm:node$node-$os
+        env:
+          node: ${{ matrix.node }}
+          os: ${{ matrix.os }}
+      - name: Publish images with default OS
+        if: ${{ matrix.os == env.default_os }}
+        run: |
+          docker push $ns/pnpm:$pnpm_patch-node$node
+          docker push $ns/pnpm:$pnpm_minor-node$node
+          docker push $ns/pnpm:$pnpm_major-node$node
+          docker push $ns/pnpm:node$node
+        env:
+          node: ${{ matrix.node }}
+      - name: Test images with default Node.js
+        if: ${{ matrix.node == env.default_node }}
+        run: |
+          docker push $ns/pnpm:$pnpm_patch-$os
+          docker push $ns/pnpm:$pnpm_minor-$os
+          docker push $ns/pnpm:$pnpm_major-$os
+          docker push $ns/pnpm:$os
+        env:
+          os: ${{ matrix.os }}
+      - name: Publish images with default Node.js and default OS
+        if: ${{ matrix.node == env.default_node && matrix.os == env.default_os }}
+        run: |
+          docker push $ns/pnpm:$pnpm_patch
+          docker push $ns/pnpm:$pnpm_minor
+          docker push $ns/pnpm:$pnpm_major
+          docker push $ns/pnpm
